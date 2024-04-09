@@ -18,17 +18,34 @@ from . import util
 from pprint import pprint
 
 
-def draw_pose(pose, H, W):
-    bodies = pose["bodies"]
-    faces = pose["faces"]
-    hands = pose["hands"]
-    candidate = bodies["candidate"]
-    subset = bodies["subset"]
-
+def draw_pose(
+    pose,
+    H,
+    W,
+    include_body=True,
+    include_face=True,
+    include_hand=True,
+    include_eye=False,
+):
     canvas = np.zeros(shape=(H, W, 3), dtype=np.uint8)
-    canvas = util.draw_bodypose(canvas, candidate, subset)
-    canvas = util.draw_handpose(canvas, hands)
-    canvas = util.draw_facepose(canvas, faces)
+
+    if include_body:
+        bodies = pose["bodies"]
+        candidate = bodies["candidate"]
+        subset = bodies["subset"]
+        canvas = util.draw_bodypose(canvas, candidate, subset)
+
+    if include_face:
+        faces = pose["faces"]
+        canvas = util.draw_facepose(canvas, faces)
+
+    if include_hand:
+        hands = pose["hands"]
+        canvas = util.draw_handpose(canvas, hands)
+
+    if (not include_face) and include_eye:
+        faces = pose["faces"][:, 36:48, :]
+        canvas = util.draw_facepose(canvas, faces)
 
     return canvas
 
@@ -51,7 +68,7 @@ def candidate2pose(
     candidate,
     subset,
     include_body: bool = True,
-    include_face: bool = False,
+    include_face: bool = True,
     hand_and_face: bool = None,
     include_hand: bool = True,
 ):
@@ -103,9 +120,27 @@ def size_calculate(H, W, resolution):
     return H, W
 
 
-def pose2map(pose, H_in, W_in, detect_resolution, image_resolution):
+def pose2map(
+    pose,
+    H_in,
+    W_in,
+    detect_resolution,
+    image_resolution,
+    include_body=True,
+    include_face=True,
+    include_hand=True,
+    include_eye=False,
+):
     H, W = size_calculate(H_in, W_in, detect_resolution)
-    detected_map = draw_pose(pose, H, W)
+    detected_map = draw_pose(
+        pose,
+        H,
+        W,
+        include_body=include_body,
+        include_face=include_face,
+        include_hand=include_hand,
+        include_eye=include_eye,
+    )
     detected_map = HWC3(detected_map)
 
     H, W = size_calculate(H, W, image_resolution)
@@ -157,10 +192,10 @@ class DWposeDetector:
         include_body: bool = True,
         include_hand: bool = True,
         include_face: bool = True,
-        hand_hand_face: bool = None,
-        **kwargs
+        hand_and_face: bool = None,
+        **kwargs,
     ):
-        if hand_hand_face:
+        if hand_and_face:
             include_face = True
             include_hand = True
         input_image = cv2.cvtColor(
